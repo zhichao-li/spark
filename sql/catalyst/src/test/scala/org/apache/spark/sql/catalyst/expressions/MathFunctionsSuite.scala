@@ -18,7 +18,7 @@
 package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.SparkFunSuite
-import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.types.{FloatType, Decimal, IntegerType, DoubleType}
 
 class MathFunctionsSuite extends SparkFunSuite with ExpressionEvalHelper {
 
@@ -204,4 +204,14 @@ class MathFunctionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     testBinary(Atan2, math.atan2)
   }
 
+  test("round") {
+    checkEvaluation( Round(Literal(Decimal(1.26)), Literal(1)), Decimal(1.3, 3, 1))
+    checkEvaluation(Round(Literal(1.23D), Literal(1)), 1.2)
+    checkEvaluation(Round(Literal(1.25D), Literal(1)), 1.3)
+    checkEvaluation(Round(Literal(1.5F), Literal(0)), 2.0F)
+    checkEvaluation(Round(Literal(1.toShort), Literal(0)), 1.toShort)
+    checkEvaluation(Round(Literal(2.toByte), Literal(0)), 2.toByte)
+    checkEvaluation(Round(Literal(23456789L), Literal(0)), 23456789L)
+    checkEvaluation(Round(Literal(123), Literal(0)), 123)
+  }
 }
