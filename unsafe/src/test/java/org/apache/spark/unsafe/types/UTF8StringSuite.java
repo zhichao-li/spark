@@ -316,6 +316,12 @@ public class UTF8StringSuite {
   }
 
   @Test
+  public void translate() {
+    assertEquals(fromString("1a2s3ae"), fromString("translate").translate(fromString("rnlt"), fromString("123")));
+
+  }
+
+  @Test
   public void createBlankString() {
     assertEquals(fromString(" "), blankString(1));
     assertEquals(fromString("  "), blankString(2));

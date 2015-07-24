@@ -20,7 +20,7 @@ package org.apache.spark.unsafe.types;
 import javax.annotation.Nonnull;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
-import java.util.Arrays;
+import java.util.*;
 
 import org.apache.spark.unsafe.PlatformDependent;
 import org.apache.spark.unsafe.array.ByteArrayMethods;
@@ -506,6 +506,28 @@ public final class UTF8String implements Comparable<UTF8String>, Serializable {
       res[i] = fromString(splits[i]);
     }
     return res;
+  }
+  
+  public UTF8String translate(UTF8String matchingString, UTF8String replaceString) {
+    String srcStr = this.toString();
+    String matching = matchingString.toString();
+    String replace = replaceString.toString();
+    Map<Character, Character> dict = new HashMap<Character, Character>();
+    int i = 0;
+    int j = 0;
+    while (i < matching.length() && j < replace.length()) {
+      dict.put(matching.charAt(i), replace.charAt(j));
+      i++;
+      j++;
+    }
+    StringBuilder sb = new StringBuilder();
+    for(int k = 0; k< srcStr.length(); k++) {
+      Character c = dict.get(srcStr.charAt(k));
+      if (c != null) {
+        sb.append(c);
+      }
+    }
+    return fromString(sb.toString());
   }
 
   @Override
