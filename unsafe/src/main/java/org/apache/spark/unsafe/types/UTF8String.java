@@ -20,7 +20,7 @@ package org.apache.spark.unsafe.types;
 import javax.annotation.Nonnull;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
-import java.util.Arrays;
+import java.util.*;
 
 import org.apache.spark.unsafe.PlatformDependent;
 import org.apache.spark.unsafe.array.ByteArrayMethods;
@@ -506,6 +506,42 @@ public final class UTF8String implements Comparable<UTF8String>, Serializable {
       res[i] = fromString(splits[i]);
     }
     return res;
+  }
+  
+  private class Code {
+    public final Character value;
+    public Code(Character value) {
+      this.value = value;
+    }
+    public boolean isEmpty(){
+      return value == null;
+    }
+  }
+
+  public UTF8String translate(UTF8String matchingString, UTF8String replaceString) {
+    String srcStr = this.toString();
+    String matching = matchingString.toString();
+    String replace = replaceString.toString();
+    Map<Character, Code> dict = new HashMap<>();
+    int i = 0;
+    int j = 0;
+    while (i < matching.length() && j < replace.length()) {
+      dict.put(matching.charAt(i), new Code(replace.charAt(j)));
+      i++;
+      j++;
+    }
+    while (i < matching.length()) {
+      dict.put(matching.charAt(i++), new Code(null));
+    }
+    StringBuilder sb = new StringBuilder();
+    for(int k = 0; k< srcStr.length(); k++) {
+      if (null == dict.get(srcStr.charAt(k))) {
+        sb.append(srcStr.charAt(k));
+      } else if (!dict.get(srcStr.charAt(k)).isEmpty()){
+        sb.append(dict.get(srcStr.charAt(k)).value);
+      }
+    }
+    return fromString(sb.toString());
   }
 
   @Override

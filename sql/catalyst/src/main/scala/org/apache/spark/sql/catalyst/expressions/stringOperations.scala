@@ -284,6 +284,66 @@ case class EndsWith(left: Expression, right: Expression)
 }
 
 /**
+ * A function translate any character in the `srcExpr` by a character in `replaceExpr`.
+ * The characters in `replaceExpr` is corresponding to the characters in `matchingExpr`.
+ * The translate will happen when any character in the string matching with the character
+ * in the `matchingExpr`.
+ */
+case class StringTranslate(srcExpr: Expression, matchingExpr: Expression, replaceExpr: Expression)
+  extends Expression with ImplicitCastInputTypes {
+
+  override def foldable: Boolean = srcExpr.foldable && matchingExpr.foldable && replaceExpr.foldable
+  override def nullable: Boolean = srcExpr.nullable || matchingExpr.nullable || replaceExpr.nullable
+
+  override def dataType: DataType = StringType
+
+  override def inputTypes: Seq[DataType] = Seq(StringType, StringType, StringType)
+
+  override def children: Seq[Expression] = srcExpr :: matchingExpr :: replaceExpr :: Nil
+
+  override def eval(input: InternalRow): Any = {
+    val srcEval = srcExpr.eval(input)
+    if (srcEval != null) {
+      val matchingEval = matchingExpr.eval(input)
+      if (matchingEval != null) {
+        val replaceEval = replaceExpr.eval(input)
+        if (replaceEval != null) {
+          return srcEval.asInstanceOf[UTF8String]
+            .translate(matchingEval.asInstanceOf[UTF8String], replaceEval.asInstanceOf[UTF8String])
+        }
+      }
+    }
+    null
+  }
+
+  override def genCode(ctx: CodeGenContext, ev: GeneratedExpressionCode): String = {
+    val srcGen = srcExpr.gen(ctx)
+    val matchingGen = matchingExpr.gen(ctx)
+    val replaceGen = replaceExpr.gen(ctx)
+
+    s"""
+      ${srcGen.code}
+      boolean ${ev.isNull} = ${srcGen.isNull};
+      ${ctx.javaType(dataType)} ${ev.primitive} = ${ctx.defaultValue(dataType)};
+      if (!${ev.isNull}) {
+        ${matchingGen.code}
+        if (!${matchingGen.isNull}) {
+          ${replaceGen.code}
+          if (!${replaceGen.isNull}) {
+            ${ev.primitive} = ${srcGen.primitive}
+              .translate(${matchingGen.primitive}, ${replaceGen.primitive});
+          } else {
+            ${ev.isNull} = true;
+          }
+        } else {
+          ${ev.isNull} = true;
+        }
+      }
+     """
+  }
+}
+
+/**
  * A function that trim the spaces from both ends for the specified string.
  */
 case class StringTrim(child: Expression)

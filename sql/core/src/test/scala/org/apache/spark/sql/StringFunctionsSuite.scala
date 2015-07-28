@@ -110,6 +110,18 @@ class StringFunctionsSuite extends QueryTest {
     // scalastyle:on
   }
 
+  test("string translate") {
+    val df = Seq(("translate", "rnlt", "123")).toDF("a", "b", "c")
+
+    checkAnswer(df.select(translate($"a", $"b", $"c")), Row("1a2s3ae"))
+    checkAnswer(df.select(translate($"a", lit(""), $"c")), Row("translate"))
+    checkAnswer(df.select(translate($"a", $"b", lit(""))), Row("asae"))
+    // scalastyle:off
+    // non ascii characters are not allowed in the source code, so we disable the scalastyle.
+    checkAnswer(df.select(translate(lit("花花世界"), lit("花界"), lit("ab"))), Row("aa世b"))
+    // scalastyle:on
+  }
+
   test("string trim functions") {
     val df = Seq(("  example  ", "")).toDF("a", "b")
 

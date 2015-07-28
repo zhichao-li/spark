@@ -331,6 +331,16 @@ class StringExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
     // scalastyle:on
   }
 
+  test("translate") {
+    checkEvaluation(StringTranslate("translate", "rnlt", "123"), "1a2s3ae")
+    checkEvaluation(StringTranslate("translate", "", "123"), "translate")
+    checkEvaluation(StringTranslate("translate", "rnlt", ""), "asae")
+    // scalastyle:off
+    // non ascii characters are not allowed in the source code, so we disable the scalastyle.
+    checkEvaluation(StringTranslate("花花世界", "花界", "ab"), "aa世b")
+    // scalastyle:on
+  }
+
   test("TRIM/LTRIM/RTRIM") {
     val s = 'a.string.at(0)
     checkEvaluation(StringTrim(Literal(" aa  ")), "aa", create_row(" abdef "))

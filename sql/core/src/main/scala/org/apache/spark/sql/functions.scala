@@ -1718,6 +1718,18 @@ object functions {
   def ascii(e: Column): Column = Ascii(e.expr)
 
   /**
+   * Translate any character in the srcString by a character in replaceString.
+   * The characters in replaceString is corresponding to the characters in matchingString.
+   * The translate will happen when any character in the string matching with the character
+   * in the matchingString.
+   *
+   * @group string_funcs
+   * @since 1.5.0
+   */
+  def translate(srcString: Column, matchingString: Column, replaceString: Column): Column =
+    StringTranslate(srcString.expr, matchingString.expr, replaceString.expr)
+
+  /**
    * Trim the spaces from both ends for the specified string column.
    *
    * @group string_funcs
