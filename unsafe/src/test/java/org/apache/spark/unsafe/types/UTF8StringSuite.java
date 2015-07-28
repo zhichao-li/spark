@@ -326,6 +326,8 @@ public class UTF8StringSuite {
     // Test for multiple mapping
     assertEquals(
       fromString("12cd"), fromString("abcd").translate(fromString("aba"), fromString("123")));
+    assertEquals(
+      fromString("12cd"), fromString("abcd").translate(fromString("aba"), fromString("12")));
   }
 
   @Test

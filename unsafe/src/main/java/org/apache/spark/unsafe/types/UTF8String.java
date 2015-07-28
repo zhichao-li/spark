@@ -534,7 +534,10 @@ public final class UTF8String implements Comparable<UTF8String>, Serializable {
       j++;
     }
     while (i < matching.length()) {
-      dict.put(matching.charAt(i++), new Code(null));
+      if (null == dict.get(matching.charAt(i))) {
+        dict.put(matching.charAt(i), new Code(null));
+      }
+      i++;
     }
     StringBuilder sb = new StringBuilder();
     for(int k = 0; k< srcStr.length(); k++) {
