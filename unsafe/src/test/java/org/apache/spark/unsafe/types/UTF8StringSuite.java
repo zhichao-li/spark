@@ -317,9 +317,15 @@ public class UTF8StringSuite {
 
   @Test
   public void translate() {
-    assertEquals(fromString("1a2s3ae"), fromString("translate").translate(fromString("rnlt"), fromString("123")));
-    assertEquals(fromString("translate"), fromString("translate").translate(fromString(""), fromString("123")));
-    assertEquals(fromString("asae"), fromString("translate").translate(fromString("rnlt"), fromString("")));
+    assertEquals(fromString("1a2s3ae"),
+      fromString("translate").translate(fromString("rnlt"), fromString("123")));
+    assertEquals(fromString("translate"),
+      fromString("translate").translate(fromString(""), fromString("123")));
+    assertEquals(fromString("asae"),
+      fromString("translate").translate(fromString("rnlt"), fromString("")));
+    // Test for multiple mapping
+    assertEquals(
+      fromString("12cd"), fromString("abcd").translate(fromString("aba"), fromString("123")));
   }
 
   @Test

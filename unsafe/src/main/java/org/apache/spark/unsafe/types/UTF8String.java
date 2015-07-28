@@ -526,7 +526,10 @@ public final class UTF8String implements Comparable<UTF8String>, Serializable {
     int i = 0;
     int j = 0;
     while (i < matching.length() && j < replace.length()) {
-      dict.put(matching.charAt(i), new Code(replace.charAt(j)));
+      // For multiple mapping, the first one wins.
+      if (null == dict.get(matching.charAt(i))) {
+        dict.put(matching.charAt(i), new Code(replace.charAt(j)));
+      }
       i++;
       j++;
     }
