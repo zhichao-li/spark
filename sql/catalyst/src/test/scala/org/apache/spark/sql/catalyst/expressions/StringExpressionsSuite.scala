@@ -332,12 +332,13 @@ class StringExpressionsSuite extends SparkFunSuite with ExpressionEvalHelper {
   }
 
   test("translate") {
-    checkEvaluation(StringTranslate("translate", "rnlt", "123"), "1a2s3ae")
-    checkEvaluation(StringTranslate("translate", "", "123"), "translate")
-    checkEvaluation(StringTranslate("translate", "rnlt", ""), "asae")
+    checkEvaluation(
+      StringTranslate(Literal("translate"), Literal("rnlt"), Literal("123")), "1a2s3ae")
+    checkEvaluation(StringTranslate(Literal("translate"), Literal(""), Literal("123")), "translate")
+    checkEvaluation(StringTranslate(Literal("translate"), Literal("rnlt"), Literal("")), "asae")
     // scalastyle:off
     // non ascii characters are not allowed in the source code, so we disable the scalastyle.
-    checkEvaluation(StringTranslate("花花世界", "花界", "ab"), "aa世b")
+    checkEvaluation(StringTranslate(Literal("花花世界"), Literal("花界"), Literal("ab")), "aa世b")
     // scalastyle:on
   }
 
