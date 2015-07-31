@@ -18,11 +18,11 @@
 package org.apache.spark.sql.catalyst.expressions
 
 import java.text.DecimalFormat
+import java.util.{Map => JMap, HashMap}
 import java.util.Locale
 import java.util.regex.{MatchResult, Pattern}
 
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.analysis.UnresolvedException
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -283,6 +283,33 @@ case class EndsWith(left: Expression, right: Expression)
   }
 }
 
+object StringTranslate {
+
+  def buildDict(matchingString: UTF8String, replaceString: UTF8String)
+    : JMap[Character, Character] = {
+    val matching = matchingString.toString()
+    val replace = replaceString.toString()
+    val dict = new HashMap[Character, Character]()
+    var i = 0
+    var j = 0
+    while (i < matching.length() && j < replace.length()) {
+      // For multiple mapping, the first one wins.
+      if (null == dict.get(matching.charAt(i))) {
+        dict.put(matching.charAt(i), replace.charAt(j))
+      }
+      i += 1
+      j += 1
+    }
+    while (i < matching.length()) {
+      if (null == dict.get(matching.charAt(i))) {
+        dict.put(matching.charAt(i), '0')
+      }
+      i += 1
+    }
+    dict
+  }
+}
+
 /**
  * A function translate any character in the `srcExpr` by a character in `replaceExpr`.
  * The characters in `replaceExpr` is corresponding to the characters in `matchingExpr`.
@@ -301,6 +328,10 @@ case class StringTranslate(srcExpr: Expression, matchingExpr: Expression, replac
 
   override def children: Seq[Expression] = srcExpr :: matchingExpr :: replaceExpr :: Nil
 
+  @transient private var lastMatching: UTF8String = _
+  @transient private var lastReplace: UTF8String = _
+  @transient private var dict: JMap[Character, Character] = _
+
   override def eval(input: InternalRow): Any = {
     val srcEval = srcExpr.eval(input)
     if (srcEval != null) {
@@ -308,8 +339,12 @@ case class StringTranslate(srcExpr: Expression, matchingExpr: Expression, replac
       if (matchingEval != null) {
         val replaceEval = replaceExpr.eval(input)
         if (replaceEval != null) {
-          return srcEval.asInstanceOf[UTF8String]
-            .translate(matchingEval.asInstanceOf[UTF8String], replaceEval.asInstanceOf[UTF8String])
+          if (matchingEval != lastMatching || replaceEval != lastReplace) {
+            lastMatching = matchingEval.asInstanceOf[UTF8String]
+            lastReplace = replaceEval.asInstanceOf[UTF8String]
+            dict = StringTranslate.buildDict(lastMatching, lastReplace)
+          }
+          return srcEval.asInstanceOf[UTF8String].translate(dict)
         }
       }
     }
@@ -321,6 +356,16 @@ case class StringTranslate(srcExpr: Expression, matchingExpr: Expression, replac
     val matchingGen = matchingExpr.gen(ctx)
     val replaceGen = replaceExpr.gen(ctx)
 
+    val termLastMatching = ctx.freshName("lastMatching")
+    val termLastReplace = ctx.freshName("lastReplace")
+    val termDict = ctx.freshName("dict")
+    val classNameUTF8String = classOf[UTF8String].getCanonicalName
+    val classNameDict = classOf[JMap[Character, Character]].getCanonicalName
+
+    ctx.addMutableState(classNameUTF8String, termLastMatching, s"${termLastMatching} = null;")
+    ctx.addMutableState(classNameUTF8String, termLastReplace, s"${termLastReplace} = null;")
+    ctx.addMutableState(classNameDict, termDict, s"${termDict} = null;")
+
     s"""
       ${srcGen.code}
       boolean ${ev.isNull} = ${srcGen.isNull};
@@ -330,8 +375,22 @@ case class StringTranslate(srcExpr: Expression, matchingExpr: Expression, replac
         if (!${matchingGen.isNull}) {
           ${replaceGen.code}
           if (!${replaceGen.isNull}) {
+                
+            if (!${matchingGen.primitive}.equals(${termLastMatching}) ||
+              !${replaceGen.primitive}.equals(${termLastReplace})) {
+              // matching or replace value changed
+              ${termLastMatching} = ${matchingGen.primitive};
+              ${termLastReplace} = ${replaceGen.primitive};
+              ${termDict} = org.apache.spark.sql.catalyst.expressions.StringTranslate.buildDict(${termLastMatching}, ${termLastReplace});
+            }
             ${ev.primitive} = ${srcGen.primitive}
-              .translate(${matchingGen.primitive}, ${replaceGen.primitive});
+              .translate(${termDict});
+
+                
+                
+                
+                
+
           } else {
             ${ev.isNull} = true;
           }

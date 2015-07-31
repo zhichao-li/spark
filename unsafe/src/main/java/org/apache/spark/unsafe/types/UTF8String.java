@@ -507,44 +507,39 @@ public final class UTF8String implements Comparable<UTF8String>, Serializable {
     }
     return res;
   }
-  
-  private class Code {
-    public final Character value;
-    public Code(Character value) {
-      this.value = value;
-    }
-    public boolean isEmpty(){
-      return value == null;
-    }
-  }
 
-  public UTF8String translate(UTF8String matchingString, UTF8String replaceString) {
-    String srcStr = this.toString();
+  private Map buildTranslateMap(UTF8String matchingString, UTF8String replaceString) {
     String matching = matchingString.toString();
     String replace = replaceString.toString();
-    Map<Character, Code> dict = new HashMap<>();
+    Map<Character, Character> dict = new HashMap<>();
     int i = 0;
     int j = 0;
     while (i < matching.length() && j < replace.length()) {
       // For multiple mapping, the first one wins.
       if (null == dict.get(matching.charAt(i))) {
-        dict.put(matching.charAt(i), new Code(replace.charAt(j)));
+        dict.put(matching.charAt(i), replace.charAt(j));
       }
       i++;
       j++;
     }
     while (i < matching.length()) {
       if (null == dict.get(matching.charAt(i))) {
-        dict.put(matching.charAt(i), new Code(null));
+        dict.put(matching.charAt(i), '0');
       }
       i++;
     }
+    return dict;
+  }
+  // TODO: Need to use `Code Point` here instead of Char in case the character longer than 2 bytes
+  public UTF8String translate(Map<Character, Character> dict) {
+    String srcStr = this.toString();
+
     StringBuilder sb = new StringBuilder();
     for(int k = 0; k< srcStr.length(); k++) {
       if (null == dict.get(srcStr.charAt(k))) {
         sb.append(srcStr.charAt(k));
-      } else if (!dict.get(srcStr.charAt(k)).isEmpty()){
-        sb.append(dict.get(srcStr.charAt(k)).value);
+      } else if ('0' != dict.get(srcStr.charAt(k))){
+        sb.append(dict.get(srcStr.charAt(k)));
       }
     }
     return fromString(sb.toString());
