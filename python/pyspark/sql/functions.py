@@ -249,6 +249,19 @@ def approxCountDistinct(col, rsd=None):
     return Column(jc)
 
 
+@since(1.5)
+@ignore_unicode_prefix
+def base64(col):
+    """Computes the BASE64 encoding of a binary column and returns it as a string column.
+
+    >>> df = sqlContext.createDataFrame([('abcde',)], ['a',])
+    >>> df.select(base64("a").alias('r')).collect()
+    [Row(r=u'YWJjZGU=')]
+    """
+    sc = SparkContext._active_spark_context
+    return Column(sc._jvm.functions.base64(_to_java_column(col)))
+
+
 @ignore_unicode_prefix
 @since(1.5)
 def bin(col):
@@ -299,6 +312,19 @@ def coalesce(*cols):
     return Column(jc)
 
 
+@since(1.5)
+@ignore_unicode_prefix
+def conv(col, fromBase, toBase):
+    """Convert a number from one base to another.
+
+    >>> df = sqlContext.createDataFrame([('123456',)], ['a',])
+    >>> df.select(conv("a", 10, 16).alias('r')).collect()
+    [Row(r=u'1E240')]
+    """
+    sc = SparkContext._active_spark_context
+    return Column(sc._jvm.functions.conv(_to_java_column(col), fromBase, toBase))
+
+
 @since(1.3)
 def countDistinct(col, *cols):
     """Returns a new :class:`Column` for distinct count of ``col`` or ``cols``.
@@ -312,6 +338,19 @@ def countDistinct(col, *cols):
     sc = SparkContext._active_spark_context
     jc = sc._jvm.functions.countDistinct(_to_java_column(col), _to_seq(sc, cols, _to_java_column))
     return Column(jc)
+
+
+@since(1.5)
+@ignore_unicode_prefix
+def crc32(col):
+    """Calculates the cyclic redundancy check value (CRC32) of a given value.
+
+    >>> df = sqlContext.createDataFrame([('ABC',)], ['a',])
+    >>> df.select(crc32("a").alias('r')).collect()
+    [Row(r=2743272264)]
+    """
+    sc = SparkContext._active_spark_context
+    return Column(sc._jvm.functions.crc32(_to_java_column(col)))
 
 
 @since(1.4)
@@ -409,6 +448,20 @@ def monotonicallyIncreasingId():
     """
     sc = SparkContext._active_spark_context
     return Column(sc._jvm.functions.monotonicallyIncreasingId())
+
+
+@ignore_unicode_prefix
+@since(1.5)
+def pmod(dividendCol, divisorCol):
+    """Calculates the positive value of dividend mod divisor.
+
+    >>> sqlContext.createDataFrame([(-7, 3)], ['a', 'b']).select(pmod('a', 'b').alias('r'))\
+    .collect()
+    [Row(r=2)]
+    """
+    sc = SparkContext._active_spark_context
+    jc = sc._jvm.functions.pmod(_to_java_column(dividendCol), _to_java_column(divisorCol))
+    return Column(jc)
 
 
 @since(1.4)
@@ -564,6 +617,18 @@ def length(col):
     """
     sc = SparkContext._active_spark_context
     return Column(sc._jvm.functions.length(_to_java_column(col)))
+
+
+@ignore_unicode_prefix
+@since(1.5)
+def factorial(col):
+    """Computes the factorial of the given value.
+
+    >>> sqlContext.createDataFrame([(10,)], ['a']).select(factorial('a').alias('r')).collect()
+    [Row(r=3628800)]
+    """
+    sc = SparkContext._active_spark_context
+    return Column(sc._jvm.functions.factorial(_to_java_column(col)))
 
 
 @ignore_unicode_prefix
