@@ -23,6 +23,7 @@ import java.io.EOFException
 import java.util.concurrent.atomic.{AtomicLong, AtomicInteger}
 
 import org.apache.hadoop.io.{Text, LongWritable, Writable}
+import org.apache.hadoop.mapred.lib.test.CombineFileRecordReader
 
 import scala.collection.immutable.Map
 import scala.reflect.ClassTag
@@ -30,7 +31,7 @@ import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.conf.{Configurable, Configuration}
 import org.apache.hadoop.mapred._
-import org.apache.hadoop.mapred.lib.{CombineFileRecordReaderWrapper, CombineFileRecordReader, CombineFileInputFormat, CombineFileSplit}
+import org.apache.hadoop.mapred.lib.{CombineFileRecordReaderWrapper, CombineFileInputFormat, CombineFileSplit}
 import org.apache.hadoop.util.ReflectionUtils
 
 import org.apache.spark._
@@ -253,7 +254,7 @@ class HadoopRDD[K, V](
         context.stageId, theSplit.index, context.attemptNumber, jobConf)
 
 
-      reader = new CombineFileRecordReader(jobConf, split.inputSplit.value.asInstanceOf[CombineFileSplit],  Reporter.NULL, classOf[TextRecordReaderWrapper].asInstanceOf[Class[RecordReader[K, V]]])
+      reader = new CombineFileRecordReader(jobConf, split.inputSplit.value.asInstanceOf[CombineFileSplit],  Reporter.NULL, inputFormat)//new CombineFileRecordReader(jobConf, split.inputSplit.value.asInstanceOf[CombineFileSplit],  Reporter.NULL, classOf[TextRecordReaderWrapper].asInstanceOf[Class[RecordReader[K, V]]])
       
 //      reader = inputFormat.getRecordReader(split.inputSplit.value, jobConf, Reporter.NULL)
 
