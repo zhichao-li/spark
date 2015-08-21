@@ -20,22 +20,17 @@ package org.apache.spark.rdd
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.io.EOFException
+import java.util.concurrent.atomic.{AtomicLong, AtomicInteger}
+
+import org.apache.hadoop.io.{Text, LongWritable, Writable}
 
 import scala.collection.immutable.Map
 import scala.reflect.ClassTag
 import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.conf.{Configurable, Configuration}
-import org.apache.hadoop.mapred.FileSplit
-import org.apache.hadoop.mapred.InputFormat
-import org.apache.hadoop.mapred.InputSplit
-import org.apache.hadoop.mapred.JobConf
-import org.apache.hadoop.mapred.RecordReader
-import org.apache.hadoop.mapred.Reporter
-import org.apache.hadoop.mapred.JobID
-import org.apache.hadoop.mapred.TaskAttemptID
-import org.apache.hadoop.mapred.TaskID
-import org.apache.hadoop.mapred.lib.CombineFileSplit
+import org.apache.hadoop.mapred._
+import org.apache.hadoop.mapred.lib.{CombineFileRecordReaderWrapper, CombineFileRecordReader, CombineFileInputFormat, CombineFileSplit}
 import org.apache.hadoop.util.ReflectionUtils
 
 import org.apache.spark._
@@ -47,6 +42,12 @@ import org.apache.spark.rdd.HadoopRDD.HadoopMapPartitionsWithSplitRDD
 import org.apache.spark.util.{SerializableConfiguration, NextIterator, Utils}
 import org.apache.spark.scheduler.{HostTaskLocation, HDFSCacheTaskLocation}
 import org.apache.spark.storage.StorageLevel
+
+
+class TextRecordReaderWrapper (split: CombineFileSplit, conf: Configuration, reporter: Reporter, idx: Integer)
+  extends CombineFileRecordReaderWrapper[LongWritable,Text](new TextInputFormat(), split, conf, reporter, idx) {
+  // this constructor signature is required by CombineFileRecordReader
+}
 
 /**
  * A Spark split class that wraps around a Hadoop InputSplit.
@@ -97,6 +98,8 @@ private[spark] class HadoopPartition(rddId: Int, idx: Int, @transient s: InputSp
  * @param valueClass Class of the value associated with the inputFormatClass.
  * @param minPartitions Minimum number of HadoopRDD partitions (Hadoop Splits) to generate.
  */
+
+
 @DeveloperApi
 class HadoopRDD[K, V](
     @transient sc: SparkContext,
@@ -195,8 +198,10 @@ class HadoopRDD[K, V](
     HadoopRDD.putCachedMetadata(inputFormatCacheKey, newInputFormat)
     newInputFormat
   }
-
+ 
   override def getPartitions: Array[Partition] = {
+    var start = System.currentTimeMillis()
+
     val jobConf = getJobConf()
     // add the credentials here as this can be called before SparkContext initialized
     SparkHadoopUtil.get.addCredentials(jobConf)
@@ -204,13 +209,22 @@ class HadoopRDD[K, V](
     if (inputFormat.isInstanceOf[Configurable]) {
       inputFormat.asInstanceOf[Configurable].setConf(jobConf)
     }
-    val inputSplits = inputFormat.getSplits(jobConf, minPartitions)
+    val combine = new CombineFileInputFormat[Writable, Writable] {
+      override def getRecordReader(split: InputSplit, job: JobConf, reporter: Reporter): RecordReader[Writable, Writable] = {
+        null
+      }
+    }
+    val inputSplits = combine.getSplits(jobConf, minPartitions)
     val array = new Array[Partition](inputSplits.size)
     for (i <- 0 until inputSplits.size) {
       array(i) = new HadoopPartition(id, i, inputSplits(i))
     }
+    var stop = System.currentTimeMillis()
+    HadoopRDD.totalTime.addAndGet((stop - start)/1000)
     array
   }
+
+
 
   override def compute(theSplit: Partition, context: TaskContext): InterruptibleIterator[(K, V)] = {
     val iter = new NextIterator[(K, V)] {
@@ -233,10 +247,15 @@ class HadoopRDD[K, V](
       inputMetrics.setBytesReadCallback(bytesReadCallback)
 
       var reader: RecordReader[K, V] = null
+      
       val inputFormat = getInputFormat(jobConf)
       HadoopRDD.addLocalConfiguration(new SimpleDateFormat("yyyyMMddHHmm").format(createTime),
         context.stageId, theSplit.index, context.attemptNumber, jobConf)
-      reader = inputFormat.getRecordReader(split.inputSplit.value, jobConf, Reporter.NULL)
+
+
+      reader = new CombineFileRecordReader(jobConf, split.inputSplit.value.asInstanceOf[CombineFileSplit],  Reporter.NULL, classOf[TextRecordReaderWrapper].asInstanceOf[Class[RecordReader[K, V]]])
+      
+//      reader = inputFormat.getRecordReader(split.inputSplit.value, jobConf, Reporter.NULL)
 
       // Register an on-task-completion callback to close the input stream.
       context.addTaskCompletionListener{ context => closeIfNeeded() }
@@ -327,6 +346,9 @@ class HadoopRDD[K, V](
 }
 
 private[spark] object HadoopRDD extends Logging {
+
+  var totalTime = new AtomicLong(0)
+
   /**
    * Configuration's constructor is not threadsafe (see SPARK-1097 and HADOOP-10456).
    * Therefore, we synchronize on this lock before calling new JobConf() or new Configuration().

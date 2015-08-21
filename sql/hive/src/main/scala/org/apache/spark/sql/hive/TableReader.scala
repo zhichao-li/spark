@@ -244,7 +244,15 @@ class HadoopTableReader(
     if (hivePartitionRDDs.size == 0) {
       new EmptyRDD[InternalRow](sc.sparkContext)
     } else {
-      new UnionRDD(hivePartitionRDDs(0).context, hivePartitionRDDs)
+      val unionRDD = new UnionRDD(hivePartitionRDDs(0).context, hivePartitionRDDs)
+//      val sc = hivePartitionRDDs(0).context
+//      val defaultParallelism = sc.schedulerBackend.defaultParallelism()
+//      if (unionRDD.partitions.length < defaultParallelism) {
+//        unionRDD
+//      } else {
+//        unionRDD.coalesce(sc.conf.getInt("spark.hive.reader.partitions", defaultParallelism))
+//      }
+      unionRDD
     }
   }
 
