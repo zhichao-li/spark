@@ -413,6 +413,11 @@ private[spark] object SQLConf {
     "spark.sql.useSerializer2",
     defaultValue = Some(true), isPublic = false)
 
+  val MAPPER_PARTITION_COUNT = intConf(
+    "spark.sql.mapper.partitionCount",
+    defaultValue = Some(-1),
+    isPublic = true)
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
   }
@@ -481,6 +486,8 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
   private[spark] def unsafeEnabled: Boolean = getConf(UNSAFE_ENABLED)
 
   private[spark] def useSqlAggregate2: Boolean = getConf(USE_SQL_AGGREGATE2)
+
+  private[spark] def mapperPartitionCount: Int = getConf(MAPPER_PARTITION_COUNT)
 
   private[spark] def useSqlSerializer2: Boolean = getConf(USE_SQL_SERIALIZER2)
 

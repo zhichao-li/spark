@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.mapred.lib.test;
+package org.apache.spark.mapred;
 
 import java.io.*;
 import java.lang.reflect.*;
@@ -33,7 +33,7 @@ import org.apache.hadoop.mapred.lib.CombineFileSplit;
 /**
  * A generic RecordReader that can hand out different recordReaders
  * for each chunk in a {@link org.apache.hadoop.mapred.lib.CombineFileSplit}.
- * A CombineFileSplit can combine data chunks from multiple files. 
+ * A CombineFileSplit can combine data chunks from multiple files.
  * This class allows using different RecordReaders for processing
  * these data chunks from different files.
  * @see org.apache.hadoop.mapred.lib.CombineFileSplit
@@ -45,8 +45,6 @@ public class CombineFileRecordReader<K, V> implements RecordReader<K, V> {
   protected CombineFileSplit split;
   protected JobConf jc;
   protected Reporter reporter;
-  protected Class<RecordReader<K, V>> rrClass;
-  protected Constructor<RecordReader<K, V>> rrConstructor;
   protected FileSystem fs;
 
   protected int idx;
@@ -133,7 +131,6 @@ public class CombineFileRecordReader<K, V> implements RecordReader<K, V> {
     // get a record reader for the idx-th chunk
     try {
       curReader = new CombineFileRecordReaderWrapper((FileInputFormat)inputFormat, split, jc, reporter, idx){};
-
       // setup some helper config variables.
       jc.set(JobContext.MAP_INPUT_FILE, split.getPath(idx).toString());
       jc.setLong(JobContext.MAP_INPUT_START, split.getOffset(idx));

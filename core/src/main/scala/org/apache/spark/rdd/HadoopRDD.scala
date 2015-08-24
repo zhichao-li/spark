@@ -20,10 +20,9 @@ package org.apache.spark.rdd
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.io.EOFException
-import java.util.concurrent.atomic.{AtomicLong, AtomicInteger}
 
-import org.apache.hadoop.io.{Text, LongWritable, Writable}
-import org.apache.hadoop.mapred.lib.test.CombineFileRecordReader
+import org.apache.hadoop.io.{Writable}
+import org.apache.spark.mapred.CombineFileRecordReader
 
 import scala.collection.immutable.Map
 import scala.reflect.ClassTag
@@ -31,7 +30,7 @@ import scala.collection.mutable.ListBuffer
 
 import org.apache.hadoop.conf.{Configurable, Configuration}
 import org.apache.hadoop.mapred._
-import org.apache.hadoop.mapred.lib.{CombineFileRecordReaderWrapper, CombineFileInputFormat, CombineFileSplit}
+import org.apache.hadoop.mapred.lib.{CombineFileInputFormat, CombineFileSplit}
 import org.apache.hadoop.util.ReflectionUtils
 
 import org.apache.spark._
@@ -193,7 +192,7 @@ class HadoopRDD[K, V](
     HadoopRDD.putCachedMetadata(inputFormatCacheKey, newInputFormat)
     newInputFormat
   }
- 
+
   override def getPartitions: Array[Partition] = {
     val jobConf = getJobConf()
     // add the credentials here as this can be called before SparkContext initialized
@@ -214,8 +213,6 @@ class HadoopRDD[K, V](
     }
     array
   }
-
-
 
   override def compute(theSplit: Partition, context: TaskContext): InterruptibleIterator[(K, V)] = {
     val iter = new NextIterator[(K, V)] {
@@ -238,7 +235,6 @@ class HadoopRDD[K, V](
       inputMetrics.setBytesReadCallback(bytesReadCallback)
 
       var reader: RecordReader[K, V] = null
-      
       val inputFormat = getInputFormat(jobConf)
       HadoopRDD.addLocalConfiguration(new SimpleDateFormat("yyyyMMddHHmm").format(createTime),
         context.stageId, theSplit.index, context.attemptNumber, jobConf)
