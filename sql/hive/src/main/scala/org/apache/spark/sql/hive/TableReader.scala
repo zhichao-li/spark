@@ -241,15 +241,15 @@ class HadoopTableReader(
     }.toSeq
 
     // Even if we don't use any partitions, we still need an empty RDD
-    if (hivePartitionRDDs.size == 0) {
+    val unionRDD = if (hivePartitionRDDs.size == 0) {
       new EmptyRDD[InternalRow](sc.sparkContext)
     } else {
-      val unionRDD = new UnionRDD(hivePartitionRDDs(0).context, hivePartitionRDDs) 
-      if (sc.conf.mapperPartitionCount > 0) {
-        unionRDD.coalesce(sc.conf.mapperPartitionCount)
-      } else {
-        unionRDD
-      }
+      new UnionRDD(hivePartitionRDDs(0).context, hivePartitionRDDs)
+    }
+    if (sc.conf.mapperPartitionCount > 0) {
+      unionRDD.coalesce(sc.conf.mapperPartitionCount)
+    } else {
+      unionRDD
     }
   }
 

@@ -20,11 +20,12 @@ object Test {
 
 //    val tableName = "myparts_big"
 //    val partitionNum = 5000
-//    val tableName = "myparts_10000"
-//    val partitionNum = 10000
-    val tableName = "ty"
-    val partitionNum = 1000
-    val items = 10000
+    val tableName = "myparts_10000"
+    val partitionNum = 10000
+    
+//    val tableName = "ty"
+//    val partitionNum = 1000
+//    val items = 10000
 //    createTable(tableName, partitionNum, items)
     
     queryTable(tableName)
@@ -33,7 +34,7 @@ object Test {
     
     def queryTable(tableName: String) = {
           var start = System.currentTimeMillis()
-          sqlContext.sql("set hive.execution.engine=spark")
+          sqlContext.sql("set spark.sql.mapper.partitionCount=5")
           println( sqlContext.sql(s"select * from $tableName").collect.length + " length" )
           var stop = System.currentTimeMillis()
           println((stop - start)/1000)
