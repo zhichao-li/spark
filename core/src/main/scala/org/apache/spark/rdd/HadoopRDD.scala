@@ -44,12 +44,6 @@ import org.apache.spark.util.{SerializableConfiguration, NextIterator, Utils}
 import org.apache.spark.scheduler.{HostTaskLocation, HDFSCacheTaskLocation}
 import org.apache.spark.storage.StorageLevel
 
-
-class TextRecordReaderWrapper (split: CombineFileSplit, conf: Configuration, reporter: Reporter, idx: Integer)
-  extends CombineFileRecordReaderWrapper[LongWritable,Text](new TextInputFormat(), split, conf, reporter, idx) {
-  // this constructor signature is required by CombineFileRecordReader
-}
-
 /**
  * A Spark split class that wraps around a Hadoop InputSplit.
  */
@@ -201,8 +195,6 @@ class HadoopRDD[K, V](
   }
  
   override def getPartitions: Array[Partition] = {
-    var start = System.currentTimeMillis()
-
     val jobConf = getJobConf()
     // add the credentials here as this can be called before SparkContext initialized
     SparkHadoopUtil.get.addCredentials(jobConf)
@@ -220,8 +212,6 @@ class HadoopRDD[K, V](
     for (i <- 0 until inputSplits.size) {
       array(i) = new HadoopPartition(id, i, inputSplits(i))
     }
-    var stop = System.currentTimeMillis()
-    HadoopRDD.totalTime.addAndGet((stop - start)/1000)
     array
   }
 
@@ -254,9 +244,7 @@ class HadoopRDD[K, V](
         context.stageId, theSplit.index, context.attemptNumber, jobConf)
 
 
-      reader = new CombineFileRecordReader(jobConf, split.inputSplit.value.asInstanceOf[CombineFileSplit],  Reporter.NULL, inputFormat)//new CombineFileRecordReader(jobConf, split.inputSplit.value.asInstanceOf[CombineFileSplit],  Reporter.NULL, classOf[TextRecordReaderWrapper].asInstanceOf[Class[RecordReader[K, V]]])
-      
-//      reader = inputFormat.getRecordReader(split.inputSplit.value, jobConf, Reporter.NULL)
+      reader = new CombineFileRecordReader(jobConf, split.inputSplit.value.asInstanceOf[CombineFileSplit],  Reporter.NULL, inputFormat)
 
       // Register an on-task-completion callback to close the input stream.
       context.addTaskCompletionListener{ context => closeIfNeeded() }
@@ -347,9 +335,6 @@ class HadoopRDD[K, V](
 }
 
 private[spark] object HadoopRDD extends Logging {
-
-  var totalTime = new AtomicLong(0)
-
   /**
    * Configuration's constructor is not threadsafe (see SPARK-1097 and HADOOP-10456).
    * Therefore, we synchronize on this lock before calling new JobConf() or new Configuration().
