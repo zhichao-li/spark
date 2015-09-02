@@ -24,9 +24,9 @@ import org.apache.hadoop.mapred.lib.CombineFileInputFormat;
 import org.apache.hadoop.mapred.lib.CombineFileSplit;
 
 public class CombineSparkInputFormat<K, V> extends CombineFileInputFormat<K, V> {
-  
+
   private InputFormat<K, V> inputformat;
-  
+
   public CombineSparkInputFormat(InputFormat<K, V> inputformat, int splitSize) {
     this.inputformat = inputformat;
     // If a maxSplitSize is specified, then blocks on the same node are
