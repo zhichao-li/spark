@@ -19,13 +19,24 @@ package org.apache.spark.mapred;
 
 import java.io.IOException;
 
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapred.lib.CombineFileInputFormat;
+import org.apache.hadoop.mapred.lib.CombineFileSplit;
 
 public class CombineSparkInputFormat<K, V> extends CombineFileInputFormat<K, V> {
+  
+  private InputFormat<K, V> inputformat;
+  
+  public CombineSparkInputFormat(InputFormat<K, V> inputformat, int splitSize) {
+    this.inputformat = inputformat;
+    // If a maxSplitSize is specified, then blocks on the same node are
+    // combined to form a single split. Blocks that are left over are
+    // then combined with other blocks in the same rack.
+    // If maxSplitSize is not specified(default 0), then blocks from the same rack
+    // are combined in a single split; no attempt is made to create
+    // node-local splits.
+    super.setMaxSplitSize(splitSize);
+  }
 
   @Override
   public void setMaxSplitSize(long size) {
@@ -34,6 +45,7 @@ public class CombineSparkInputFormat<K, V> extends CombineFileInputFormat<K, V> 
   
   @Override
   public RecordReader getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
-    throw new RuntimeException("this operation hasn't been implemented");
+     return new CombineFileRecordReader(job, (CombineFileSplit)split, Reporter.NULL, inputformat);
   }
+
 }

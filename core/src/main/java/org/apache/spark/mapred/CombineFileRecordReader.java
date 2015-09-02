@@ -22,6 +22,7 @@ import java.io.*;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapred.lib.CombineFileRecordReaderWrapper;
 import org.apache.hadoop.mapred.lib.CombineFileSplit;
@@ -69,7 +70,8 @@ public class CombineFileRecordReader<K, V> implements RecordReader<K, V> {
   }
 
   public K createKey() {
-    return curReader.createKey();
+    return (K) new Text(currentPath);
+    //return curReader.createKey();
   }
 
   public V createValue() {

@@ -20,8 +20,6 @@ package org.apache.spark.sql.hive
 import java.util
 import java.util.HashMap
 
-import com.google.common.collect.{ArrayListMultimap, Multimap}
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants._
@@ -36,6 +34,7 @@ import org.apache.hadoop.mapred.{FileInputFormat, InputFormat, JobConf}
 
 import org.apache.spark.Logging
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.mapred.CombineSparkInputFormat
 import org.apache.spark.rdd.{EmptyRDD, HadoopRDD, RDD, UnionRDD}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -44,6 +43,7 @@ import org.apache.spark.unsafe.types.UTF8String
 import org.apache.spark.util.{SerializableConfiguration, Utils}
 
 import scala.collection.mutable.ArrayBuffer
+import scala.language.existentials
 
 /**
  * A trait for subclasses that handle table scans.
@@ -54,7 +54,7 @@ private[hive] sealed trait TableReader {
   def makeRDDForPartitionedTable(partitions: Seq[HivePartition]): RDD[InternalRow]
 }
 
-case class PartitionInfo(partPath: String,
+case class PartitionInfomation(partPath: String,
     partDesc: PartitionDesc,
     ifc: java.lang.Class[InputFormat[Writable, Writable]],
     tableDesc: TableDesc,
@@ -217,34 +217,34 @@ class HadoopTableReader(
           relation.partitionKeys.contains(attr)
         }
 
-      (inputPathStr, PartitionInfo(inputPathStr, partDesc,
+      (inputPathStr, PartitionInfomation(inputPathStr, partDesc,
         ifc, relation.tableDesc,_broadcastedHiveConf.value, partDeserializer, mutableRow,
         partitionKeyAttrs, nonPartitionKeyAttrs, relation.partitionKeys))
     }
     toRDD(partitionInfos)
   }
 
-  private def toRDD(pathToPartitionMap: Map[String, PartitionInfo]): RDD[InternalRow] = {
+  private def toRDD(pathToPartitionMap: Map[String, PartitionInfomation]): RDD[InternalRow] = {
     val inputformatToPartitions =
-      new HashMap[Class[InputFormat[Writable, Writable]], ArrayBuffer[PartitionInfo]]
-    pathToPartitionMap.foreach { case (path: String, partition: PartitionInfo) =>
+      new HashMap[Class[InputFormat[Writable, Writable]], ArrayBuffer[PartitionInfomation]]
+    pathToPartitionMap.foreach { case (path: String, partition: PartitionInfomation) =>
       if (!inputformatToPartitions.containsKey(partition.ifc)) {
-        inputformatToPartitions.put(partition.ifc, new ArrayBuffer[PartitionInfo]())
+        inputformatToPartitions.put(partition.ifc, new ArrayBuffer[PartitionInfomation]())
       }
       inputformatToPartitions.get(partition.ifc) += partition
     }
     val rdds = new ArrayBuffer[RDD[InternalRow]]
     val ifcIterator = inputformatToPartitions.keySet().iterator()
     // Gather all of the partitions which share the same inputformat and then throw them to the
-    // CombineSparkInputFormat which just a wrapper of CombineFileInputFormat
+    // CombineSparkInputFormat which is a wrapper of CombineFileInputFormat
     while (ifcIterator.hasNext) {
       val paths = pathToPartitionMap.keys.toSeq
       val initializeJobConfFunc = HadoopTableReader.initializeLocalJobConfFunc(paths, null) _
-      val rdd = new SparkPartitionRDD(
+      val rdd = new HadoopPartitionRDD(
         sc,
         _broadcastedHiveConf.asInstanceOf[Broadcast[SerializableConfiguration]],
         Some(initializeJobConfFunc),
-        ifcIterator.next(),
+        new CombineSparkInputFormat(ifcIterator.next().newInstance(), sc.conf.mapperSplitSize),
         classOf[Writable],
         classOf[Writable],
         _minSplitsPerRDD).map { item =>
@@ -331,7 +331,7 @@ private[hive] object HadoopTableReader extends HiveInspectors with Logging {
     mutableRow
   }
 
-  def toInternalRow(value: Writable, partitionInfo: PartitionInfo): InternalRow = {
+  def toInternalRow(value: Writable, partitionInfo: PartitionInfomation): InternalRow = {
     val tableDesc = partitionInfo.tableDesc
     val hconf = partitionInfo.conf.value
     val localDeserializer = partitionInfo.partDeserializer
