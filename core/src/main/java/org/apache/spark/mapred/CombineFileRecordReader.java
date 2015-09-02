@@ -60,14 +60,6 @@ public class CombineFileRecordReader<K, V> implements RecordReader<K, V> {
     }
     return true;
   }
-  
-  public boolean next(K key, V value, CurrentPath path)  throws IOException {
-    if(next(key, value)) {
-      path.setPath(currentPath);
-      return true;
-    }
-    return false;
-  }
 
   public K createKey() {
     return (K) new Text(currentPath);

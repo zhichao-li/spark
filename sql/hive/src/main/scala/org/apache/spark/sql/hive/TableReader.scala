@@ -304,11 +304,11 @@ class HadoopTableReader(
 private[hive] object HadoopTableReader extends HiveInspectors with Logging {
 
   private def enrichMutableRow(partSpec: util.LinkedHashMap[String, String],
-                               partProps: java.util.Properties,
-                               mutableRow: MutableRow,
-                               partitionKeyAttrs: Seq[(Attribute, Int)],
-                               nonPartitionKeyAttrs: Seq[(Attribute, Int)],
-                               partitionKeys: Seq[AttributeReference]) = {
+      partProps: java.util.Properties,
+      mutableRow: MutableRow,
+      partitionKeyAttrs: Seq[(Attribute, Int)],
+      nonPartitionKeyAttrs: Seq[(Attribute, Int)],
+      partitionKeys: Seq[AttributeReference]) = {
     val partColsDelimited: String = partProps.getProperty(META_TABLE_PARTITION_COLUMNS)
     // Partitioning columns are delimited by "/"
     val partCols = partColsDelimited.trim().split("/").toSeq
@@ -342,7 +342,6 @@ private[hive] object HadoopTableReader extends HiveInspectors with Logging {
     // get the table deserializer
     val tableSerDe = tableDesc.getDeserializerClass.newInstance()
     tableSerDe.initialize(hconf, tableDesc.getProperties)
-
 
     // fill the non partition key attributes
     fillObject(Seq(value).iterator, deserializer, partitionInfo.nonPartitionKeyAttrs,

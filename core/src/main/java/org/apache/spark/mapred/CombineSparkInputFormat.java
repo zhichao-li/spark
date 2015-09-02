@@ -42,7 +42,7 @@ public class CombineSparkInputFormat<K, V> extends CombineFileInputFormat<K, V> 
   public void setMaxSplitSize(long size) {
     super.setMaxSplitSize(size);
   }
-  
+
   @Override
   public RecordReader getRecordReader(InputSplit split, JobConf job, Reporter reporter) throws IOException {
      return new CombineFileRecordReader(job, (CombineFileSplit)split, Reporter.NULL, inputformat);
