@@ -1,3 +1,5 @@
+
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,7 +24,6 @@ import java.io.*;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapred.lib.CombineFileRecordReaderWrapper;
 import org.apache.hadoop.mapred.lib.CombineFileSplit;
@@ -61,9 +62,16 @@ public class CombineFileRecordReader<K, V> implements RecordReader<K, V> {
     return true;
   }
 
+  public boolean next(K key, V value, CurrentPath path)  throws IOException {
+    if(next(key, value)) {
+      path.setPath(currentPath);
+      return true;
+    }
+    return false;
+  }
+
   public K createKey() {
-    return (K) new Text(currentPath);
-    //return curReader.createKey();
+    return curReader.createKey();
   }
 
   public V createValue() {
@@ -144,3 +152,4 @@ public class CombineFileRecordReader<K, V> implements RecordReader<K, V> {
     return true;
   }
 }
+

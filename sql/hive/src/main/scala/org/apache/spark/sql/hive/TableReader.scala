@@ -224,33 +224,55 @@ class HadoopTableReader(
     toRDD(partitionInfos)
   }
 
-  private def toRDD(pathToPartitionMap: Map[String, PartitionInfomation]): RDD[InternalRow] = {
-    val inputformatToPartitions =
+  private def generatePartitionMapByFormat(pathToPartitionMap: Map[String, PartitionInfomation]) = {
+    val iformatToPartitionsMap =
       new HashMap[Class[InputFormat[Writable, Writable]], ArrayBuffer[PartitionInfomation]]
     pathToPartitionMap.foreach { case (path: String, partition: PartitionInfomation) =>
-      if (!inputformatToPartitions.containsKey(partition.ifc)) {
-        inputformatToPartitions.put(partition.ifc, new ArrayBuffer[PartitionInfomation]())
+      if (!iformatToPartitionsMap.containsKey(partition.ifc)) {
+        iformatToPartitionsMap.put(partition.ifc, new ArrayBuffer[PartitionInfomation]())
       }
-      inputformatToPartitions.get(partition.ifc) += partition
+      iformatToPartitionsMap.get(partition.ifc) += partition
     }
+    iformatToPartitionsMap
+  }
+
+  private def toRDD(pathToPartitionMap: Map[String, PartitionInfomation]): RDD[InternalRow] = {
+    val iformatToPartitionsMap = generatePartitionMapByFormat(pathToPartitionMap)
     val rdds = new ArrayBuffer[RDD[InternalRow]]
-    val ifcIterator = inputformatToPartitions.keySet().iterator()
+    val ifcIterator = iformatToPartitionsMap.keySet().iterator()
     // Gather all of the partitions which share the same inputformat and then throw them to the
     // CombineSparkInputFormat which is a wrapper of CombineFileInputFormat
     while (ifcIterator.hasNext) {
-      val paths = pathToPartitionMap.keys.toSeq
+      val ifc = ifcIterator.next()
+      val paths = iformatToPartitionsMap.get(ifc).map(_.partPath)
       val initializeJobConfFunc = HadoopTableReader.initializeLocalJobConfFunc(paths, null) _
       val rdd = new HadoopPartitionRDD(
         sc,
         _broadcastedHiveConf.asInstanceOf[Broadcast[SerializableConfiguration]],
         Some(initializeJobConfFunc),
-        new CombineSparkInputFormat(ifcIterator.next().newInstance(), sc.conf.mapperSplitSize),
+        ifc,
         classOf[Writable],
         classOf[Writable],
-        _minSplitsPerRDD).map { item =>
-        val dir = new Path(item._1.toString).getParent.toString
-        HadoopTableReader.toInternalRow(
-          item._2.asInstanceOf[Writable], pathToPartitionMap.get(dir).get)
+        _minSplitsPerRDD,
+        sc.conf.mapperSplitSize).mapPartitions { partition =>
+        val dirToDeserializerMap = new HashMap[String, (Deserializer, Deserializer)]
+        // create deserializer instance per partition instead of record.
+        partition.map {case (filePath: Writable, record: Writable) =>
+          val dir = new Path(filePath.toString).getParent.toString
+          if (!dirToDeserializerMap.containsKey(dir)) {
+            val partitionInfo = pathToPartitionMap.get(dir).get
+            // create partition deserializer
+            val partDe = partitionInfo.partDeserializer.newInstance()
+            // create table deserializer
+            val tableDe = partitionInfo.tableDesc.getDeserializerClass.newInstance()
+            dirToDeserializerMap.put(dir, (partDe, tableDe))
+            HadoopTableReader.toInternalRow(record, partitionInfo, partDe, tableDe)
+          } else {
+            val (partDe, tableDe) = dirToDeserializerMap.get(dir)
+            HadoopTableReader.toInternalRow(record, pathToPartitionMap.get(dir).get,
+              partDe, tableDe)
+          }
+        }
       }
       rdds += rdd
     }
@@ -331,26 +353,27 @@ private[hive] object HadoopTableReader extends HiveInspectors with Logging {
     mutableRow
   }
 
-  def toInternalRow(value: Writable, partitionInfo: PartitionInfomation): InternalRow = {
+  def toInternalRow(value: Writable,
+      partitionInfo: PartitionInfomation,
+      partDe: Deserializer,
+      tableDe: Deserializer): InternalRow = {
     val tableDesc = partitionInfo.tableDesc
     val hconf = partitionInfo.conf.value
-    val localDeserializer = partitionInfo.partDeserializer
-    val deserializer = localDeserializer.newInstance()
     val partSpec = partitionInfo.partDesc.getPartSpec
     val partProps = partitionInfo.partDesc.getProperties
-    deserializer.initialize(hconf, partProps)
-    // get the table deserializer
-    val tableSerDe = tableDesc.getDeserializerClass.newInstance()
-    tableSerDe.initialize(hconf, tableDesc.getProperties)
+
+    // init partDeserializer and tableDeserializer
+    partDe.initialize(hconf, partProps)
+    tableDe.initialize(hconf, tableDesc.getProperties)
 
     // fill the non partition key attributes
-    fillObject(Seq(value).iterator, deserializer, partitionInfo.nonPartitionKeyAttrs,
+    fillObject(Seq(value).iterator, partDe, partitionInfo.nonPartitionKeyAttrs,
       enrichMutableRow(partSpec,
         partProps,
         partitionInfo.mutableRow,
         partitionInfo.partitionKeyAttrs,
         partitionInfo.nonPartitionKeyAttrs,
-        partitionInfo.partitionKeys), tableSerDe).next()
+        partitionInfo.partitionKeys), tableDe).next()
   }
 
   /**
