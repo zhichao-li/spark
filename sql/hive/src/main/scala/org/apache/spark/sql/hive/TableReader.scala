@@ -224,7 +224,7 @@ class HadoopTableReader(
     toRDD(partitionInfos)
   }
 
-  private def generatePartitionMapByFormat(pathToPartitionMap: Map[String, PartitionInfomation]) = {
+  private def genFormatToPartitionArray(pathToPartitionMap: Map[String, PartitionInfomation]) = {
     val iformatToPartitionsMap =
       new HashMap[Class[InputFormat[Writable, Writable]], ArrayBuffer[PartitionInfomation]]
     pathToPartitionMap.foreach { case (path: String, partition: PartitionInfomation) =>
@@ -237,15 +237,17 @@ class HadoopTableReader(
   }
 
   private def toRDD(pathToPartitionMap: Map[String, PartitionInfomation]): RDD[InternalRow] = {
-    val iformatToPartitionsMap = generatePartitionMapByFormat(pathToPartitionMap)
+    val iformatToPartitionsMap = genFormatToPartitionArray(pathToPartitionMap)
     val rdds = new ArrayBuffer[RDD[InternalRow]]
     val ifcIterator = iformatToPartitionsMap.keySet().iterator()
     // Gather all of the partitions which share the same inputformat and then throw them to the
     // CombineSparkInputFormat which is a wrapper of CombineFileInputFormat
     while (ifcIterator.hasNext) {
       val ifc = ifcIterator.next()
-      val paths = iformatToPartitionsMap.get(ifc).map(_.partPath)
-      val initializeJobConfFunc = HadoopTableReader.initializeLocalJobConfFunc(paths, null) _
+      val partitionInfos = iformatToPartitionsMap.get(ifc)
+      val paths = partitionInfos.map(_.partPath)
+      val initializeJobConfFunc = HadoopTableReader.initializeLocalJobConfFunc(paths,
+        partitionInfos.iterator.next().tableDesc) _
       val rdd = new HadoopPartitionRDD(
         sc,
         _broadcastedHiveConf.asInstanceOf[Broadcast[SerializableConfiguration]],
