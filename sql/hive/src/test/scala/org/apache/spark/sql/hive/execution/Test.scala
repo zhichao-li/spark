@@ -35,7 +35,7 @@ object Test {
 
     def queryTable(tableName: String) = {
       var start = System.currentTimeMillis()
-      sqlContext.sql("set spark.sql.mapper.partitionCount=5")
+      sqlContext.sql("set spark.sql.mapper.splitSize=1000")
       println( sqlContext.sql(s"select * from $tableName").collect.length + " length" )
       var stop = System.currentTimeMillis()
       println((stop - start)/1000)
