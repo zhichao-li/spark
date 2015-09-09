@@ -24,7 +24,7 @@ object Test {
     //    val tableName = "myparts_10000"
     //    val partitionNum = 10000
 
-//        createTable(tableName, partitionNum, items)
+//    createTable(tableName, partitionNum, items)
 
     queryTable(tableName)
 
@@ -38,7 +38,7 @@ object Test {
 
     def createTable(tableName: String, partitionNum: Int, item: Int) = {
       sqlContext.sql(s"drop table if exists $tableName")
-      sqlContext.sql(s"create table $tableName (a int, b int, c int) partitioned by (d string, e int) stored as sequencefile") //stored as parquetfile")
+      sqlContext.sql(s"create table $tableName (a int, b int, c int) partitioned by (d string, e int) stored as orc") //stored as parquetfile  sequencefile")
       sqlContext.sql("set hive.exec.dynamic.partition.mode=nonstrict")
       sqlContext.sql("set hive.exec.max.dynamic.partitions=10000")
       val df = (1 to item).map { i => (i, i, i, i ) }.toDF("a", "b", "c", "d")

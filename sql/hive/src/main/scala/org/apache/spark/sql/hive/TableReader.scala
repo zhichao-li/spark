@@ -221,8 +221,27 @@ class HadoopTableReader(
         ifc, relation.tableDesc,_broadcastedHiveConf.value, partDeserializer, mutableRow,
         partitionKeyAttrs, nonPartitionKeyAttrs, relation.partitionKeys))
     }
-    toRDD(partitionInfos)
+    val (combinablePartInfos: Map[String, PartitionInfomation],
+      unCombinablePartInfos: Map[String, PartitionInfomation]) = partitionInfos.partition {
+      case (path: String, partitionInfo: PartitionInfomation) =>
+        partitionInfo.ifc.isAssignableFrom(classOf[FileInputFormat[Writable, Writable]])
+    }
+    val combinedRDD = toRDDForCombinablePartitions(combinablePartInfos)
+    val unCombinedRDDs = toRDDForUncombinablePartitions(unCombinablePartInfos)
+    new UnionRDD(combinedRDD.context, unCombinedRDDs)
   }
+
+  private def toRDDForUncombinablePartitions(pathToPartitionMap: Map[String, PartitionInfomation])
+  : Seq[RDD[InternalRow]] = {
+    pathToPartitionMap.values.map {partitionInfo =>
+      val rdd = createHadoopRdd(
+        partitionInfo.tableDesc,
+        partitionInfo.partPath,
+        partitionInfo.ifc).map {(partitionInfo.partPath, _)}
+      toInternalRowRDD(rdd, pathToPartitionMap)
+    }.toSeq
+  }
+
 
   private def genFormatToPartitionArray(pathToPartitionMap: Map[String, PartitionInfomation]) = {
     val iformatToPartitionsMap =
@@ -235,8 +254,33 @@ class HadoopTableReader(
     }
     iformatToPartitionsMap
   }
+  
+  private def toInternalRowRDD(rdd: RDD[(String, Writable)],
+      pathToPartitionMap: Map[String, PartitionInfomation]) = {
+    rdd.mapPartitions { partition =>
+      val dirToDeserializerMap = new HashMap[String, (Deserializer, Deserializer)]
+      // create deserializer instance per partition instead of record.
+      partition.map {case (partPath: String, record: Writable) =>
+        val (partitionInfo, partDe, tableDe) = if (!dirToDeserializerMap.containsKey(partPath)) {
+          val partitionInfo = pathToPartitionMap.get(partPath).get
+          // create partition deserializer
+          val partDe = partitionInfo.partDeserializer.newInstance()
+          // create table deserializer
+          val tableDe = partitionInfo.tableDesc.getDeserializerClass.newInstance()
+          dirToDeserializerMap.put(partPath, (partDe, tableDe))
+          (partitionInfo, partDe, tableDe)
+        } else {
+          val (partDe, tableDe) = dirToDeserializerMap.get(partPath)
+          (pathToPartitionMap.get(partPath).get, partDe, tableDe)
+        }
+        HadoopTableReader.toInternalRow(record, partitionInfo, partDe, tableDe)
+      }
+    }
+    
+  }
 
-  private def toRDD(pathToPartitionMap: Map[String, PartitionInfomation]): RDD[InternalRow] = {
+  private def toRDDForCombinablePartitions(pathToPartitionMap: Map[String, PartitionInfomation])
+      : RDD[InternalRow] = {
     val iformatToPartitionsMap = genFormatToPartitionArray(pathToPartitionMap)
     val rdds = new ArrayBuffer[RDD[InternalRow]]
     val ifcIterator = iformatToPartitionsMap.keySet().iterator()
@@ -256,27 +300,10 @@ class HadoopTableReader(
         classOf[Writable],
         classOf[Writable],
         _minSplitsPerRDD,
-        sc.conf.mapperSplitSize).mapPartitions { partition =>
-        val dirToDeserializerMap = new HashMap[String, (Deserializer, Deserializer)]
-        // create deserializer instance per partition instead of record.
-        partition.map {case (filePath: Writable, record: Writable) =>
-          val dir = new Path(filePath.toString).getParent.toString
-          val (partitionInfo, partDe, tableDe) = if (!dirToDeserializerMap.containsKey(dir)) {
-            val partitionInfo = pathToPartitionMap.get(dir).get
-            // create partition deserializer
-            val partDe = partitionInfo.partDeserializer.newInstance()
-            // create table deserializer
-            val tableDe = partitionInfo.tableDesc.getDeserializerClass.newInstance()
-            dirToDeserializerMap.put(dir, (partDe, tableDe))
-            (partitionInfo, partDe, tableDe)
-          } else {
-            val (partDe, tableDe) = dirToDeserializerMap.get(dir)
-            (pathToPartitionMap.get(dir).get, partDe, tableDe)
-          }
-          HadoopTableReader.toInternalRow(record, partitionInfo, partDe, tableDe)
-        }
+        sc.conf.mapperSplitSize).map {item =>
+        (new Path(item._1.toString).getParent.toString, item._2)
       }
-      rdds += rdd
+      rdds += toInternalRowRDD(rdd, pathToPartitionMap)
     }
     // Even if we don't use any partitions, we still need an empty RDD
     if (rdds.size == 0) {
