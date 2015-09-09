@@ -261,19 +261,19 @@ class HadoopTableReader(
         // create deserializer instance per partition instead of record.
         partition.map {case (filePath: Writable, record: Writable) =>
           val dir = new Path(filePath.toString).getParent.toString
-          if (!dirToDeserializerMap.containsKey(dir)) {
+          val (partitionInfo, partDe, tableDe) = if (!dirToDeserializerMap.containsKey(dir)) {
             val partitionInfo = pathToPartitionMap.get(dir).get
             // create partition deserializer
             val partDe = partitionInfo.partDeserializer.newInstance()
             // create table deserializer
             val tableDe = partitionInfo.tableDesc.getDeserializerClass.newInstance()
             dirToDeserializerMap.put(dir, (partDe, tableDe))
-            HadoopTableReader.toInternalRow(record, partitionInfo, partDe, tableDe)
+            (partitionInfo, partDe, tableDe)
           } else {
             val (partDe, tableDe) = dirToDeserializerMap.get(dir)
-            HadoopTableReader.toInternalRow(record, pathToPartitionMap.get(dir).get,
-              partDe, tableDe)
+            (pathToPartitionMap.get(dir).get, partDe, tableDe)
           }
+          HadoopTableReader.toInternalRow(record, partitionInfo, partDe, tableDe)
         }
       }
       rdds += rdd

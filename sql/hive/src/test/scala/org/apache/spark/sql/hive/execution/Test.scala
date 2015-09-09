@@ -24,14 +24,9 @@ object Test {
     //    val tableName = "myparts_10000"
     //    val partitionNum = 10000
 
-    //    val tableName = "ty"
-    //    val partitionNum = 1000
-    //    val items = 10000
 //        createTable(tableName, partitionNum, items)
 
     queryTable(tableName)
-    //    println("total time: " + HadoopRDD.totalTime)
-    // Thread.sleep(1000000000)
 
     def queryTable(tableName: String) = {
       var start = System.currentTimeMillis()
@@ -52,5 +47,4 @@ object Test {
       sqlContext.sql(s"insert into table $tableName partition(d='ee', e) select a, b, c, d  % $partitionNum as e from mydf")
     }
   }
-  //createTable("myparts_600_1tw", 10000, 100000000)
 }
