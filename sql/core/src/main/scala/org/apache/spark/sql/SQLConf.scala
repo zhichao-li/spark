@@ -66,6 +66,8 @@ private[spark] object SQLConf {
 
   val USE_SQL_SERIALIZER2 = "spark.sql.useSerializer2"
 
+  val MAPPER_SPLIT_SIZE = "spark.sql.mapper.splitSize"
+
   object Deprecated {
     val MAPRED_REDUCE_TASKS = "mapred.reduce.tasks"
   }
@@ -151,6 +153,7 @@ private[sql] class SQLConf extends Serializable {
 
   private[spark] def useSqlSerializer2: Boolean = getConf(USE_SQL_SERIALIZER2, "true").toBoolean
 
+
   /**
    * Upper bound on the sizes (in bytes) of the tables qualified for the auto conversion to
    * a broadcast value during the physical executions of join operations.  Setting this to -1
@@ -160,6 +163,9 @@ private[sql] class SQLConf extends Serializable {
    */
   private[spark] def autoBroadcastJoinThreshold: Int =
     getConf(AUTO_BROADCASTJOIN_THRESHOLD, (10 * 1024 * 1024).toString).toInt
+
+  private[spark] def mapperSplitSize: Int = getConf(MAPPER_SPLIT_SIZE, "0").toInt
+
 
   /**
    * The default size in bytes to assign to a logical operator's estimation statistics.  By default,
