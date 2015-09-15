@@ -221,14 +221,19 @@ class HadoopTableReader(
         ifc, relation.tableDesc,_broadcastedHiveConf.value, partDeserializer, mutableRow,
         partitionKeyAttrs, nonPartitionKeyAttrs, relation.partitionKeys))
     }
-    val (combinablePartInfos: Map[String, PartitionInfomation],
+    // create one RDD per partition without files combination
+    if (sc.conf.mapperSplitSize < 0) {
+      toRDDForUncombinablePartitions(partitionInfos)
+    } else {
+      val (combinablePartInfos: Map[String, PartitionInfomation],
       unCombinablePartInfos: Map[String, PartitionInfomation]) = partitionInfos.partition {
-      case (path: String, partitionInfo: PartitionInfomation) =>
-        classOf[FileInputFormat[Writable, Writable]].isAssignableFrom(partitionInfo.ifc)
+        case (path: String, partitionInfo: PartitionInfomation) =>
+          classOf[FileInputFormat[Writable, Writable]].isAssignableFrom(partitionInfo.ifc)
+      }
+      val combinedRDD = toRDDForCombinablePartitions(combinablePartInfos)
+      val unCombinedRDDs = toRDDForUncombinablePartitions(unCombinablePartInfos)
+      combinedRDD.union(unCombinedRDDs)
     }
-    val combinedRDD = toRDDForCombinablePartitions(combinablePartInfos)
-    val unCombinedRDDs = toRDDForUncombinablePartitions(unCombinablePartInfos)
-    combinedRDD.union(unCombinedRDDs)
   }
 
   private def toRDDForUncombinablePartitions(pathToPartitionMap: Map[String, PartitionInfomation])
