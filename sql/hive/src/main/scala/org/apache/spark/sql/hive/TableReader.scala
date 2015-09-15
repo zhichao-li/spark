@@ -224,29 +224,30 @@ class HadoopTableReader(
     val (combinablePartInfos: Map[String, PartitionInfomation],
       unCombinablePartInfos: Map[String, PartitionInfomation]) = partitionInfos.partition {
       case (path: String, partitionInfo: PartitionInfomation) =>
-        partitionInfo.ifc.isAssignableFrom(classOf[FileInputFormat[Writable, Writable]])
+        classOf[FileInputFormat[Writable, Writable]].isAssignableFrom(partitionInfo.ifc)
     }
     val combinedRDD = toRDDForCombinablePartitions(combinablePartInfos)
     val unCombinedRDDs = toRDDForUncombinablePartitions(unCombinablePartInfos)
-    new UnionRDD(combinedRDD.context, unCombinedRDDs)
+    combinedRDD.union(unCombinedRDDs)
   }
 
   private def toRDDForUncombinablePartitions(pathToPartitionMap: Map[String, PartitionInfomation])
-  : Seq[RDD[InternalRow]] = {
-    pathToPartitionMap.values.map {partitionInfo =>
+  : RDD[InternalRow] = {
+    val rdds = pathToPartitionMap.values.map {partitionInfo =>
       val rdd = createHadoopRdd(
         partitionInfo.tableDesc,
         partitionInfo.partPath,
         partitionInfo.ifc).map {(partitionInfo.partPath, _)}
       toInternalRowRDD(rdd, pathToPartitionMap)
     }.toSeq
+    new UnionRDD(sc.sparkContext, rdds)
   }
 
 
   private def genFormatToPartitionArray(pathToPartitionMap: Map[String, PartitionInfomation]) = {
     val iformatToPartitionsMap =
       new HashMap[Class[InputFormat[Writable, Writable]], ArrayBuffer[PartitionInfomation]]
-    pathToPartitionMap.foreach { case (path: String, partition: PartitionInfomation) =>
+    pathToPartitionMap.foreach { case (path, partition) =>
       if (!iformatToPartitionsMap.containsKey(partition.ifc)) {
         iformatToPartitionsMap.put(partition.ifc, new ArrayBuffer[PartitionInfomation]())
       }
@@ -305,12 +306,7 @@ class HadoopTableReader(
       }
       rdds += toInternalRowRDD(rdd, pathToPartitionMap)
     }
-    // Even if we don't use any partitions, we still need an empty RDD
-    if (rdds.size == 0) {
-      new EmptyRDD[InternalRow](sc.sparkContext)
-    } else {
-      new UnionRDD(rdds(0).context, rdds)
-    }
+    new UnionRDD(sc.sparkContext, rdds)
   }
 
   /**

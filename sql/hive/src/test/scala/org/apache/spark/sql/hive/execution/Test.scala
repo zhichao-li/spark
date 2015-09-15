@@ -15,7 +15,7 @@ object Test {
     val sc = new SparkContext(conf)
     val sqlContext = new HiveContext(sc)
     import sqlContext.implicits._
-        val tableName = "myparts_small"
+        val tableName = "myparts_small1"
         val partitionNum = 100
         val items = 1000
 
@@ -30,7 +30,7 @@ object Test {
 
     def queryTable(tableName: String) = {
       var start = System.currentTimeMillis()
-      sqlContext.sql("set spark.sql.mapper.splitSize=1000")
+      //sqlContext.sql("set spark.sql.mapper.splitSize=1000")
       println( sqlContext.sql(s"select * from $tableName").collect.length + " length" )
       var stop = System.currentTimeMillis()
       println((stop - start)/1000)
@@ -38,7 +38,7 @@ object Test {
 
     def createTable(tableName: String, partitionNum: Int, item: Int) = {
       sqlContext.sql(s"drop table if exists $tableName")
-      sqlContext.sql(s"create table $tableName (a int, b int, c int) partitioned by (d string, e int) stored as orc") //stored as parquetfile  sequencefile")
+      sqlContext.sql(s"create table $tableName (a int, b int, c int) partitioned by (d string, e int) stored as  parquetfile") //stored as parquetfile  orc sequencefile")
       sqlContext.sql("set hive.exec.dynamic.partition.mode=nonstrict")
       sqlContext.sql("set hive.exec.max.dynamic.partitions=10000")
       val df = (1 to item).map { i => (i, i, i, i ) }.toDF("a", "b", "c", "d")
