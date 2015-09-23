@@ -71,10 +71,10 @@ case class PartitionInfomation(partPath: String,
  */
 private[hive]
 class HadoopTableReader(
-    @transient attributes: Seq[Attribute],
-    @transient relation: MetastoreRelation,
-    @transient sc: HiveContext,
-    @transient hiveExtraConf: HiveConf)
+    @transient private val attributes: Seq[Attribute],
+    @transient private val relation: MetastoreRelation,
+    @transient private val sc: HiveContext,
+    hiveExtraConf: HiveConf)
   extends TableReader with Logging {
 
   // Hadoop honors "mapred.map.tasks" as hint, but will ignore when mapred.job.tracker is "local".
