@@ -34,17 +34,17 @@ import org.apache.spark.SparkContext
  * @tparam L type of listener
  * @tparam E type of event
  */
-private[spark] abstract class AsynchronousListenerBus[L <: AnyRef, E](name: String)
+private[spark] abstract class AsynchronousListenerBus[L <: AnyRef, E](
+    name: String,
+    eventQueueSize: Int = 10000)
   extends ListenerBus[L, E] {
 
   self =>
 
   private var sparkContext: SparkContext = null
-
   /* Cap the capacity of the event queue so we get an explicit error (rather than
    * an OOM exception) if it's perpetually being added to more quickly than it's being drained. */
-  private val EVENT_QUEUE_CAPACITY = 10000
-  private val eventQueue = new LinkedBlockingQueue[E](EVENT_QUEUE_CAPACITY)
+  private val eventQueue = new LinkedBlockingQueue[E](eventQueueSize)
 
   // Indicate if `start()` is called
   private val started = new AtomicBoolean(false)

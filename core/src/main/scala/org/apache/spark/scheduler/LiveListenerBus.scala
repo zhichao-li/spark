@@ -28,8 +28,9 @@ import org.apache.spark.util.AsynchronousListenerBus
  * has started will events be actually propagated to all attached listeners. This listener bus
  * is stopped when it receives a SparkListenerShutdown event, which is posted using stop().
  */
-private[spark] class LiveListenerBus
-  extends AsynchronousListenerBus[SparkListener, SparkListenerEvent]("SparkListenerBus")
+private[spark] class LiveListenerBus(eventQueueSize: Int = 10000)
+  extends AsynchronousListenerBus[SparkListener, SparkListenerEvent](
+    "SparkListenerBus", eventQueueSize)
   with SparkListenerBus {
 
   private val logDroppedEvent = new AtomicBoolean(false)
