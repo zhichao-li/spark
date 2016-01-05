@@ -1009,7 +1009,7 @@ class Analyzer(
  */
 object EliminateSubQueries extends Rule[LogicalPlan] {
   def apply(plan: LogicalPlan): LogicalPlan = plan transform {
-    case Subquery(_, child) => child
+    case Subquery(_, child, _) => child
   }
 }
 

@@ -182,11 +182,40 @@ abstract class LogicalPlan extends QueryPlan[LogicalPlan] with Logging {
     resolve(UnresolvedAttribute.parseAttributeName(name), output, resolver)
   }
 
+
+  private def reduceQualifiers(
+    nameParts: Seq[String],
+    resolver: Resolver,
+    qualifiers: Seq[String]): (Boolean, Seq[String]) = {
+    if (qualifiers.isEmpty) {
+      return (true, nameParts)
+    }
+    // We assume qualifiers[qStarter]=0 is dbname, qualifiers[qStarter]=1 is table name
+    var qStarter = 0
+    var i = 0
+    var j = 0
+    while (qStarter < 2 && i < qualifiers.size && j < nameParts.size) {
+      if (resolver(qualifiers(i), nameParts(j))) {
+        i += 1
+        j += 1
+      } else {
+        qStarter += 1
+        i = qStarter
+        j = 0
+      }
+    }
+    if (i > 0) {
+      (true, nameParts.slice(j, nameParts.size))
+    } else {
+      (false, Nil)
+    }
+  }
+
   /**
    * Resolve the given `name` string against the given attribute, returning either 0 or 1 match.
    *
    * This assumes `name` has multiple parts, where the 1st part is a qualifier
-   * (i.e. table name, alias, or subquery alias).
+   * (i.e. database name, table name, alias, or subquery alias).
    * See the comment above `candidates` variable in resolve() for semantics the returned data.
    */
   private def resolveAsTableColumn(
@@ -194,12 +223,12 @@ abstract class LogicalPlan extends QueryPlan[LogicalPlan] with Logging {
       resolver: Resolver,
       attribute: Attribute): Option[(Attribute, List[String])] = {
     assert(nameParts.length > 1)
-    if (attribute.qualifiers.exists(resolver(_, nameParts.head))) {
-      // At least one qualifier matches. See if remaining parts match.
-      val remainingParts = nameParts.tail
-      resolveAsColumn(remainingParts, resolver, attribute)
-    } else {
+
+    val (isMatch, reducedNameParts) = reduceQualifiers(nameParts, resolver, attribute.qualifiers)
+    if (!isMatch) {
       None
+    } else {
+      resolveAsColumn(reducedNameParts, resolver, attribute)
     }
   }
 
@@ -233,7 +262,7 @@ abstract class LogicalPlan extends QueryPlan[LogicalPlan] with Logging {
     // and "c" is the struct field name, i.e. "a.b.c". In this case, Attribute will be "a.b",
     // and the second element will be List("c").
     var candidates: Seq[(Attribute, List[String])] = {
-      // If the name has 2 or more parts, try to resolve it as `table.column` first.
+      // If the name has 2 or more parts, try to identify the related attribute by the qualifiers
       if (nameParts.length > 1) {
         input.flatMap { option =>
           resolveAsTableColumn(nameParts, resolver, option)

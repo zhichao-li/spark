@@ -1278,4 +1278,42 @@ class SQLQuerySuite extends QueryTest with SQLTestUtils {
         """.stripMargin), Row("b", 6.0) :: Row("a", 7.0) :: Nil)
     }
   }
+
+  test("test attribute with full qualifiers: db.table.field") {
+    sql("create database db1")
+    sql("use db1")
+    sqlContext.read.json(
+      sparkContext.makeRDD("""{"a": {"b": 1}}""" :: Nil)).write.saveAsTable("db1.tmp")
+    sqlContext.sql("create table test as select * from db1.tmp")
+    sql("create database db2")
+    sql("use db2")
+    sqlContext.read.json(
+      sparkContext.makeRDD("""{"a": {"b": 2}}""" :: Nil)).write.saveAsTable("db2.tmp")
+    sqlContext.sql("create table test as select * from db2.tmp")
+
+    // Validate table created by dataframe API
+    checkAnswer(sql("SELECT db1.tmp.a.b from db1.tmp"), Row(1) :: Nil)
+    checkAnswer(sql("SELECT db1.tmp.a.b, db2.tmp.a.b from db1.tmp, db2.tmp"), Row(1, 2) :: Nil)
+    checkAnswer(sql("SELECT tmp.a.b from db1.tmp"), Row(1) :: Nil)
+    checkAnswer(sql("SELECT a.b from db1.tmp"), Row(1) :: Nil)
+    checkAnswer(sql("SELECT a.b from tmp"), Row(2) :: Nil)
+
+    // Validate hive table
+    checkAnswer(sql("SELECT a.b from test"), Row(2) :: Nil)
+    checkAnswer(sql("SELECT a.b from db2.test"), Row(2) :: Nil)
+    checkAnswer(sql("SELECT a.b from db1.test"), Row(1) :: Nil)
+    checkAnswer(sql("SELECT test.a.b from db1.test"), Row(1) :: Nil)
+    checkAnswer(sql("SELECT db1.test.a.b from db1.test"), Row(1) :: Nil)
+    checkAnswer(sql("SELECT db1.test.a.b, db2.test.a.b from db1.test, db2.test"),
+      Row(1, 2) :: Nil)
+    checkAnswer(sql("SELECT test1.a.b, test2.a.b from db1.test as test1, db2.test as test2"),
+      Row(1, 2) :: Nil)
+
+    sql("drop table db1.test")
+    sql("drop table db1.tmp")
+    sql("drop table db2.test")
+    sql("drop table db2.tmp")
+    sql("drop database db1")
+    sql("drop database db2")
+  }
 }

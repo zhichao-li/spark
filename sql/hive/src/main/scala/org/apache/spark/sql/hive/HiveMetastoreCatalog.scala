@@ -411,8 +411,8 @@ private[hive] class HiveMetastoreCatalog(val client: ClientInterface, hive: Hive
       // Then, if alias is specified, wrap the table with a Subquery using the alias.
       // Otherwise, wrap the table with a Subquery using the table name.
       val withAlias =
-        alias.map(a => Subquery(a, dataSourceTable)).getOrElse(
-          Subquery(tableIdent.last, dataSourceTable))
+        alias.map(a => Subquery(a, dataSourceTable, Some(tableIdent.head))).getOrElse(
+          Subquery(tableIdent.last, dataSourceTable, Some(tableIdent.head)))
 
       withAlias
     } else if (table.tableType == VirtualView) {
